@@ -8,13 +8,14 @@ cycler==0.12.1
 dotenv==0.9.9
 flatbuffers==25.2.10
 fonttools==4.56.0
-jax==0.5.0
-jaxlib==0.5.0
+jax==0.5.2
+jaxlib==0.5.1
 kiwisolver==1.4.8
-matplotlib==3.10.0
+matplotlib==3.10.1
 media==0.1.6
 mediapipe==0.10.21
 ml_dtypes==0.5.1
+msvc_runtime==14.42.34433
 numpy==1.26.4
 opencv-contrib-python==4.11.0.86
 opencv-python==4.11.0.86

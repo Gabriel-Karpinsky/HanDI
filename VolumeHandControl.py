@@ -15,7 +15,7 @@ cap.set(3, wCam)
 cap.set(4, hCam)
 pTime = 0
 
-detector = htm.handDetector(detectionConf = 0.7)
+detector = htm.HandDetector(detectionConf = 0.7)
 
 devices = AudioUtilities.GetSpeakers()
 interface = devices.Activate(IAudioEndpointVolume._iid_, CLSCTX_ALL, None)

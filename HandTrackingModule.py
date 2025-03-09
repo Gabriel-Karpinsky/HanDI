@@ -1,9 +1,14 @@
 import cv2
 import mediapipe as mp
 import time
+import numpy as np
+import math
+from ctypes import cast, POINTER
+from comtypes import CLSCTX_ALL
+from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume
 
-class handDetector():
-    def __init__(self, mode = False, maxHands = 2, detectionConf = 0.5, trackConf = 0.5):
+class HandDetector:
+    def __init__(self, mode=False, maxHands=2, detectionConf=0.5, trackConf=0.5):
         self.mode = mode
         self.maxHands = maxHands
         self.detectionConf = detectionConf
@@ -13,7 +18,7 @@ class handDetector():
         self.hands = self.mpHands.Hands(self.mode, self.maxHands, 1, self.detectionConf, self.trackConf)
         self.mpDraw = mp.solutions.drawing_utils
 
-    def findHands(self, img, draw = True):
+    def findHands(self, img, draw=True):
         imgRGB = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         self.results = self.hands.process(imgRGB)
 
@@ -24,46 +29,39 @@ class handDetector():
 
         return img
 
-    def findPosition(self, img, handNo = 0, draw = True):
-
-        lmlist = []
-
+    def findPosition(self, img, handNo=0, draw=True):
+        """Returns a list of landmark positions."""
+        lmList = []
         if self.results.multi_hand_landmarks:
             myHand = self.results.multi_hand_landmarks[handNo]
-
             for id, lm in enumerate(myHand.landmark):
                 h, w, c = img.shape
                 cx, cy = int(lm.x * w), int(lm.y * h)
-                # print(id, cx, cy)
-                lmlist.append([id, cx, cy])
+                lmList.append([id, cx, cy])
                 if draw:
-                    cv2.circle(img, (cx, cy), 5, 255, cv2.FILLED)
+                    cv2.circle(img, (cx, cy), 5, (255, 0, 255), cv2.FILLED)
+        return lmList
 
-        return lmlist
+class VolumeController:
+    def __init__(self):
+        """Initialize system volume control"""
+        devices = AudioUtilities.GetSpeakers()
+        interface = devices.Activate(IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
+        self.volume = cast(interface, POINTER(IAudioEndpointVolume))
+        volRange = self.volume.GetVolumeRange()
+        self.minVol = volRange[0]
+        self.maxVol = volRange[1]
 
-def main():
-    pTime = 0
-    cTime = 0
+    def set_volume_by_hand_distance(self, lmList):
+        """Adjusts system volume based on hand distance (index finger & thumb)."""
+        if len(lmList) >= 9:
+            x1, y1 = lmList[4][1], lmList[4][2]  # Thumb
+            x2, y2 = lmList[8][1], lmList[8][2]  # Index Finger
+            length = math.hypot(x2 - x1, y2 - y1)
 
-    cap = cv2.VideoCapture(0)
-
-    detector = handDetector()
-
-    while True:
-        success, img = cap.read()
-        img = detector.findHands(img)
-        lmlist = detector.findPosition(img)
-        if len(lmlist) != 0:
-            print(lmlist[0])    # this specifies which of the 21 landmarks we want to print the position of
-
-        cTime = time.time()
-        fps = 1 / (cTime - pTime)
-        pTime = cTime
-
-        cv2.putText(img, str(int(fps)), (10, 70), cv2.FONT_HERSHEY_SIMPLEX, 3, (255, 0, 255), 3)
-
-        cv2.imshow("Image", img)
-        cv2.waitKey(1)
-
-if __name__ == "__main__":
-    main()
+            vol = np.interp(length, [45, 300], [self.minVol, self.maxVol])
+            volPercent = np.interp(length, [45, 300], [0, 100])
+            self.volume.SetMasterVolumeLevel(vol, None)
+            
+            return volPercent
+        return None

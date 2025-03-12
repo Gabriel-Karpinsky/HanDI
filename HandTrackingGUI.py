@@ -1,6 +1,7 @@
 import sys
 import os
 import cv2
+import mediapipe as mp
 import numpy as np
 from dotenv import load_dotenv, set_key
 from PyQt6.QtWidgets import QApplication, QLabel, QVBoxLayout, QWidget, QPushButton, QDialog, QSpinBox

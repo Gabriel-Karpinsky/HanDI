@@ -9,6 +9,10 @@ from PyQt6.QtGui import QImage, QPixmap
 from PyQt6.QtCore import QThread, pyqtSignal
 import HandTrackingModule as htm  # Import the updated module
 
+import cProfile
+import pstats
+import io
+
 # Load environment variables
 ENV_FILE = ".env"
 load_dotenv(ENV_FILE)
@@ -25,6 +29,8 @@ class HandTrackingThread(QThread):
         self.running = True
         self.init_camera()
 
+        
+
     def init_camera(self):
         if hasattr(self, 'cap'):
             self.cap.release()
@@ -33,6 +39,8 @@ class HandTrackingThread(QThread):
             print(f"⚠️ ERROR: Could not open camera {self.camera_index}")
 
     def run(self):
+        
+
         while self.running:
             success, frame = self.cap.read()
             if not success:
@@ -47,6 +55,9 @@ class HandTrackingThread(QThread):
                 self.volume_signal.emit(int(volume_percentage))
 
             self.frame_signal.emit(frame)
+            
+        
+        
 
     def stop(self):
         self.running = False

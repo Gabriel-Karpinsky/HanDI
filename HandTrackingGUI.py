@@ -16,10 +16,10 @@ class HandTrackingThread(QThread):
     frame_signal = pyqtSignal(np.ndarray)
     volume_signal = pyqtSignal(int)
 
-    def __init__(self, camera_index):
+    def __init__(self, camera_index,detectionConf):
         super().__init__()
         self.camera_index = camera_index
-        self.detector = htm.HandDetector(detectionConf=0.7)
+        self.detector = htm.HandDetector(detectionConf)
         self.volume_controller = htm.VolumeController()
         self.running = True
         self.init_camera()
@@ -103,10 +103,12 @@ class HandTrackingGUI(QWidget):
         self.settings_button = QPushButton("Settings")
         self.settings_button.clicked.connect(self.open_settings)
 
+    
         layout = QVBoxLayout()
         layout.addWidget(self.video_label)
         layout.addWidget(self.volume_label)
         layout.addWidget(self.settings_button)
+        layout.addWidget(self)
         self.setLayout(layout)
 
         # Start Hand Tracking in a separate thread

@@ -46,26 +46,41 @@ class HandDetector:
         
         return lmList
 
+
 class VolumeController:
     def __init__(self):
-        """Initialize system volume control"""
         devices = AudioUtilities.GetSpeakers()
         interface = devices.Activate(IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
         self.volume = cast(interface, POINTER(IAudioEndpointVolume))
         volRange = self.volume.GetVolumeRange()
         self.minVol = volRange[0]
         self.maxVol = volRange[1]
+        self.vol = 0
+        self.volBar = 400
+        self.volPercent = 100
 
-    def set_volume_by_hand_distance(self, lmList):
-        """Adjusts system volume based on hand distance (index finger & thumb)."""
+    def set_volume_by_hand_distance(self, lmList, img):
         if len(lmList) >= 9:
             x1, y1 = lmList[4][1], lmList[4][2]  # Thumb
             x2, y2 = lmList[8][1], lmList[8][2]  # Index Finger
-            length = math.hypot(x2 - x1, y2 - y1)
 
-            vol = np.interp(length, [45, 300], [self.minVol, self.maxVol])
-            volPercent = np.interp(length, [45, 300], [0, 100])
-            self.volume.SetMasterVolumeLevel(vol, None)
+            cx, cy = (x1 + x2) // 2, (y1 + y2) // 2
+
+            cv2.circle(img, (x1, y1), 10, (255, 0, 255), cv2.FILLED)
+            cv2.circle(img, (x2, y2), 10, (255, 0, 255), cv2.FILLED)
+            cv2.line(img, (x1, y1), (x2, y2), (255, 0, 255), 2)
+            cv2.circle(img, (cx, cy), 10, (255, 0, 255), cv2.FILLED)
+
+            length = math.hypot(x2 - x1, y2 - y1)
             
-            return volPercent
+            self.vol = np.interp(length, [45, 300], [self.minVol, self.maxVol])
+            self.volBar = np.interp(length, [45, 300], [400, 150])
+            self.volPercent = np.interp(length, [45, 300], [0, 100])
+            
+            self.volume.SetMasterVolumeLevel(self.vol, None)
+            
+            if length < 45:
+                cv2.circle(img, (cx, cy), 10, (0, 255, 0), cv2.FILLED)
+            
+            return self.volPercent
         return None

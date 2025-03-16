@@ -1,6 +1,7 @@
 import sys
 import os
 import cv2
+import time
 import numpy as np
 from dotenv import load_dotenv, set_key
 from PyQt6.QtWidgets import QApplication, QLabel, QVBoxLayout, QWidget, QPushButton, QDialog, QSpinBox, QSlider
@@ -19,7 +20,7 @@ def update_env_variable(key, value):
 class HandTrackingThread(QThread):
     frame_signal = pyqtSignal(np.ndarray)
     volume_signal = pyqtSignal(int)
-
+    
     def __init__(self, camera_index, detection_conf):
         super().__init__()
         self.camera_index = camera_index
@@ -28,6 +29,7 @@ class HandTrackingThread(QThread):
         self.volume_controller = htm.VolumeController()
         self.running = True
         self.init_camera()
+
 
     def init_camera(self):
         if hasattr(self, 'cap'):
@@ -46,7 +48,7 @@ class HandTrackingThread(QThread):
             frame = self.detector.findHands(frame)
             lmList = self.detector.findPosition(frame, draw=False)
             
-            volume_percentage = self.volume_controller.set_volume_by_hand_distance(lmList)
+            volume_percentage = self.volume_controller.set_volume_by_hand_distance(lmList, frame)
             if volume_percentage is not None:
                 self.volume_signal.emit(int(volume_percentage))
 
@@ -71,7 +73,7 @@ class SettingsDialog(QDialog):
         self.setGeometry(200, 200, 300, 200)
         
         layout = QVBoxLayout()
-
+        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         # Camera Index Setting
         self.cam_index_label = QLabel("Camera Index:")
         self.cam_index_spinbox = QSpinBox()
@@ -105,9 +107,13 @@ class HandTrackingGUI(QWidget):
         super().__init__()
         self.setWindowTitle("Hand Tracking GUI")
         self.setGeometry(100, 100, 800, 600)
-
+        self.setMinimumSize(400, 300)  # Set a minimum window size
+        self.setWindowFlags(self.windowFlags())
+        
         # UI Elements
         self.video_label = QLabel(self)
+        self.video_label.setMinimumSize(640, 480)  # Set a fixed minimal size for the video display
+        self.video_label.setAlignment(Qt.AlignmentFlag.AlignCenter)  # Center the vi
         self.volume_label = QLabel("Volume: 100%")
         self.settings_button = QPushButton("Settings")
         self.settings_button.clicked.connect(self.open_settings)
@@ -120,6 +126,7 @@ class HandTrackingGUI(QWidget):
         self.conf_label = QLabel(f"Detection Confidence: {self.conf_slider.value()}%")
         
         layout = QVBoxLayout()
+        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self.video_label)
         layout.addWidget(self.volume_label)
         layout.addWidget(self.settings_button)
@@ -134,10 +141,22 @@ class HandTrackingGUI(QWidget):
         self.hand_tracking_thread.frame_signal.connect(self.display_frame)
         self.hand_tracking_thread.volume_signal.connect(self.update_volume_label)
         self.hand_tracking_thread.start()
+        self.pTime = 0
+        self.cTime = 0
 
     def display_frame(self, frame):
         """Update the video feed in the GUI."""
+        frame = cv2.resize(frame, (self.video_label.width(), self.video_label.height()), interpolation=cv2.INTER_AREA)
+        """Update the video feed in the GUI with a fixed resolution."""
+        frame = cv2.resize(frame, (640, 480))  # Ensure a consistent video size
+        """Update the video feed in the GUI."""
         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        self.cTime = time.time()
+        self.fps = 1 / (self.cTime - self.pTime)
+        self.pTime = self.cTime
+
+        frame = cv2.putText(frame, f'FPS: {int(self.fps)}', (40, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 3)
+        
         h, w, ch = frame.shape
         bytes_per_line = ch * w
         qt_img = QImage(frame.data, w, h, bytes_per_line, QImage.Format.Format_RGB888)

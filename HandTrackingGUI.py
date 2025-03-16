@@ -3,23 +3,28 @@ import os
 import cv2
 import numpy as np
 from dotenv import load_dotenv, set_key
-from PyQt6.QtWidgets import QApplication, QLabel, QVBoxLayout, QWidget, QPushButton, QDialog, QSpinBox
+from PyQt6.QtWidgets import QApplication, QLabel, QVBoxLayout, QWidget, QPushButton, QDialog, QSpinBox, QSlider
 from PyQt6.QtGui import QImage, QPixmap
-from PyQt6.QtCore import QThread, pyqtSignal
+from PyQt6.QtCore import QThread, pyqtSignal, Qt
 import HandTrackingModule as htm  # Import the updated module
 
 # Load environment variables
 ENV_FILE = ".env"
 load_dotenv(ENV_FILE)
 
+def update_env_variable(key, value):
+    set_key(ENV_FILE, key, str(value))
+    load_dotenv(ENV_FILE, override=True)
+
 class HandTrackingThread(QThread):
     frame_signal = pyqtSignal(np.ndarray)
     volume_signal = pyqtSignal(int)
 
-    def __init__(self, camera_index,detectionConf):
+    def __init__(self, camera_index, detection_conf):
         super().__init__()
         self.camera_index = camera_index
-        self.detector = htm.HandDetector(detectionConf)
+        self.detection_conf = detection_conf
+        self.detector = htm.HandDetector(detectionConf=self.detection_conf)
         self.volume_controller = htm.VolumeController()
         self.running = True
         self.init_camera()
@@ -54,6 +59,10 @@ class HandTrackingThread(QThread):
     def update_camera_index(self, new_index):
         self.camera_index = new_index
         self.init_camera()
+    
+    def update_detection_conf(self, new_conf):
+        self.detection_conf = new_conf
+        self.detector = htm.HandDetector(detectionConf=self.detection_conf)
 
 class SettingsDialog(QDialog):
     def __init__(self, parent=None):
@@ -88,7 +97,7 @@ class SettingsDialog(QDialog):
         load_dotenv(ENV_FILE, override=True)
 
         print(f"Updated CAMERA_INDEX to: {new_camera_index}")
-        self.parent().update_camera_index(new_camera_index)
+        self.parent().hand_tracking_thread.update_camera_index(new_camera_index)
         self.accept()  # Close the settings dialog
 
 class HandTrackingGUI(QWidget):
@@ -103,16 +112,25 @@ class HandTrackingGUI(QWidget):
         self.settings_button = QPushButton("Settings")
         self.settings_button.clicked.connect(self.open_settings)
 
-    
+        # Detection Confidence Slider
+        self.conf_slider = QSlider(Qt.Orientation.Horizontal)
+        self.conf_slider.setRange(1, 100)
+        self.conf_slider.setValue(int(float(os.getenv("DETECTION_CONF", 70)) * 100))  # Convert to integer percentage
+        self.conf_slider.valueChanged.connect(self.update_detection_conf)
+        self.conf_label = QLabel(f"Detection Confidence: {self.conf_slider.value()}%")
+        
         layout = QVBoxLayout()
         layout.addWidget(self.video_label)
         layout.addWidget(self.volume_label)
         layout.addWidget(self.settings_button)
-        layout.addWidget(self)
+        layout.addWidget(self.conf_label)
+        layout.addWidget(self.conf_slider)
         self.setLayout(layout)
 
         # Start Hand Tracking in a separate thread
-        self.hand_tracking_thread = HandTrackingThread(int(os.getenv("CAMERA_INDEX", 0)))
+        self.hand_tracking_thread = HandTrackingThread(
+            int(os.getenv("CAMERA_INDEX", 0)), float(os.getenv("DETECTION_CONF", 0.7))
+        )
         self.hand_tracking_thread.frame_signal.connect(self.display_frame)
         self.hand_tracking_thread.volume_signal.connect(self.update_volume_label)
         self.hand_tracking_thread.start()
@@ -133,8 +151,12 @@ class HandTrackingGUI(QWidget):
         settings_window = SettingsDialog(self)
         settings_window.exec()
 
-    def update_camera_index(self, new_index):
-        self.hand_tracking_thread.update_camera_index(new_index)
+    def update_detection_conf(self, value):
+        """Update detection confidence dynamically."""
+        new_conf = value / 100.0  # Convert back to float for module usage
+        update_env_variable("DETECTION_CONF", new_conf)
+        self.conf_label.setText(f"Detection Confidence: {value}%")
+        self.hand_tracking_thread.update_detection_conf(new_conf)
 
     def closeEvent(self, event):
         """Ensure the hand tracking thread stops when the GUI is closed."""

@@ -32,14 +32,18 @@ class HandDetector:
     def findPosition(self, img, handNo=0, draw=True):
         """Returns a list of landmark positions."""
         lmList = []
-        if self.results.multi_hand_landmarks:
-            myHand = self.results.multi_hand_landmarks[handNo]
-            for id, lm in enumerate(myHand.landmark):
-                h, w, c = img.shape
-                cx, cy = int(lm.x * w), int(lm.y * h)
-                lmList.append([id, cx, cy])
-                if draw:
-                    cv2.circle(img, (cx, cy), 5, (255, 0, 255), cv2.FILLED)
+
+        # Ensure self.results exists and contains hand landmarks
+        if hasattr(self, "results") and self.results.multi_hand_landmarks:
+            if handNo < len(self.results.multi_hand_landmarks):  # Check hand index exists
+                myHand = self.results.multi_hand_landmarks[handNo]
+                for id, lm in enumerate(myHand.landmark):
+                    h, w, c = img.shape
+                    cx, cy = int(lm.x * w), int(lm.y * h)
+                    lmList.append([id, cx, cy])
+                    if draw:
+                        cv2.circle(img, (cx, cy), 5, (255, 0, 255), cv2.FILLED)
+        
         return lmList
 
 class VolumeController:

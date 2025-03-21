@@ -43,6 +43,12 @@ while True:
         # Convert the volume
 
         # Reduce the resolution to make it smoother
+
+        # Check if the relevant fingers are up
+
+        # If the pinky is down, change the volume
+
+        # Drawings
         print(lmList[4], lmList[8])
 
         x1, y1 = lmList[4][1], lmList[4][2]

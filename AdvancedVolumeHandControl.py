@@ -62,7 +62,7 @@ while True:
 
             # If the pinky is down, change the volume
             if not fingers[4]:
-                volume.SetMasterVolumeLevel(volPercent / 100, None)
+                volume.SetMasterVolumeLevelScalar(volPercent / 100, None)
                 cv2.circle(img, (lineInfo[4], lineInfo[5]), 10, (0, 255, 0), cv2.FILLED)
                 volColor = (0, 255, 0)
             else:
@@ -70,8 +70,8 @@ while True:
 
     # Drawings
     # cv2.rectangle(img, (50, 150), (85, 400), (0, 255, 0), 3)
-    # cv2.rectangle(img, (50, int(volBar)), (85, 400), (0, 255, 0), cv2.FILLED)
-    # cv2.putText(img, f'{int(volPercent)}%', (40, 450), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 3)
+    cv2.rectangle(img, (50, int(volBar)), (85, 400), (0, 255, 0), cv2.FILLED)
+    cv2.putText(img, f'{int(volPercent)}%', (40, 450), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 3)
     currVol = int(volume.GetMasterVolumeLevelScalar() * 100)
     cv2.putText(img, f'Volume: {int(currVol)}', (400, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, volColor, 3)
 

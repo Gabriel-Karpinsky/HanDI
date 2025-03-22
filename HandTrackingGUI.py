@@ -10,8 +10,8 @@ from PyQt6.QtCore import QThread, pyqtSignal, Qt
 import HandTrackingModule as htm  # Import the updated module
 
 # Load environment variables
-ENV_FILE = ".env"
-load_dotenv(ENV_FILE)
+ENV_FILE = os.path.join(os.path.dirname(__file__), '.env')
+load_dotenv(dotenv_path=ENV_FILE)
 
 def update_env_variable(key, value):
     set_key(ENV_FILE, key, str(value))
@@ -44,13 +44,15 @@ class HandTrackingThread(QThread):
             if not success:
                 print("⚠️ ERROR: Failed to capture frame")
                 continue
+
             frame = cv2.flip(frame, 1)
             frame = self.detector.findHands(frame)
-            lmList = self.detector.findPosition(frame, draw=False)
-            
-            volume_percentage = self.volume_controller.set_volume_by_hand_distance(lmList, frame)
-            if volume_percentage is not None:
-                self.volume_signal.emit(int(volume_percentage))
+            lmList, bbox = self.detector.findPosition(frame, draw=False)
+
+            if lmList:
+                volume_percentage = self.volume_controller.set_volume_by_hand_distance(lmList, frame, self.detector)
+                if volume_percentage is not None:
+                    self.volume_signal.emit(int(volume_percentage))
 
             self.frame_signal.emit(frame)
 

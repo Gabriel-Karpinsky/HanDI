@@ -54,7 +54,7 @@ class HandTrackingThread(QThread):
 
             frame = cv2.flip(frame, 1)
             frame = self.detector.findHands(frame)
-            lmList, bbox = self.detector.findPosition(frame, draw=False)
+            lmList, bbox = self.detector.findPosition(frame, draw=True)
 
             if lmList:
                 volume_percentage = self.volume_controller.set_volume_by_hand_distance(lmList, frame, self.detector)

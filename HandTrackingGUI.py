@@ -9,6 +9,7 @@ from PyQt6.QtGui import QImage, QPixmap
 from PyQt6.QtCore import QThread, pyqtSignal, Qt
 import HandTrackingModule as htm  # Import the updated module
 
+
 # Load environment variables
 ENV_FILE = os.path.join(os.path.dirname(__file__), '.env')
 load_dotenv(dotenv_path=ENV_FILE)
@@ -29,7 +30,7 @@ class HandTrackingThread(QThread):
         self.volume_controller = htm.VolumeController()
         self.running = True
         self.init_camera()
-
+        
 
     def init_camera(self):
         if hasattr(self, 'cap'):
@@ -37,6 +38,12 @@ class HandTrackingThread(QThread):
         self.cap = cv2.VideoCapture(self.camera_index)
         if not self.cap.isOpened():
             print(f"⚠️ ERROR: Could not open camera {self.camera_index}")
+
+    '''def init_MIDI(self):
+        self.midi_out.send(Message('note_on', note = self.note, velocity=self.MIDI_velocity))
+        self.playing_notes.add(self.note)  # Track active note
+        print(f"Playing note {self.note} with velocity {self.MIDI_velocity}")'''
+
 
     def run(self):
         while self.running:
@@ -63,10 +70,16 @@ class HandTrackingThread(QThread):
     def update_camera_index(self, new_index):
         self.camera_index = new_index
         self.init_camera()
+
+    '''def update_MIDI(self, new_MIDI_velocity):
+        self.camera_index = new_MIDI_velocity
+        self.init_camera()'''
     
     def update_detection_conf(self, new_conf):
         self.detection_conf = new_conf
         self.detector = htm.HandDetector(detectionConf=self.detection_conf)
+
+
 
 class SettingsDialog(QDialog):
     def __init__(self, parent=None):
@@ -120,6 +133,13 @@ class HandTrackingGUI(QWidget):
         self.settings_button = QPushButton("Settings")
         self.settings_button.clicked.connect(self.open_settings)
 
+        # STOP Button
+        self.stop_button = QPushButton("STOP")
+        self.stop_button.clicked.connect(self.send_MIDI_stop)
+        self.stop_button.setStyleSheet("background-color: red; color: white; font-weight: bold;")
+
+
+
         # Detection Confidence Slider
         self.conf_slider = QSlider(Qt.Orientation.Horizontal)
         self.conf_slider.setRange(1, 100)
@@ -134,6 +154,7 @@ class HandTrackingGUI(QWidget):
         layout.addWidget(self.settings_button)
         layout.addWidget(self.conf_label)
         layout.addWidget(self.conf_slider)
+        layout.addWidget(self.stop_button)
         self.setLayout(layout)
 
         # Start Hand Tracking in a separate thread
@@ -142,6 +163,7 @@ class HandTrackingGUI(QWidget):
         )
         self.hand_tracking_thread.frame_signal.connect(self.display_frame)
         self.hand_tracking_thread.volume_signal.connect(self.update_volume_label)
+        
         self.hand_tracking_thread.start()
         self.pTime = 0
         self.cTime = 0
@@ -178,12 +200,18 @@ class HandTrackingGUI(QWidget):
         update_env_variable("DETECTION_CONF", new_conf)
         self.conf_label.setText(f"Detection Confidence: {value}%")
         self.hand_tracking_thread.update_detection_conf(new_conf)
+    
+    def send_MIDI_stop(self):
+        """Send a MIDI stop signal when STOP button is pressed."""
+        self.hand_tracking_thread.volume_controller.midi.send_MIDI_stop()
 
     def closeEvent(self, event):
         """Ensure the hand tracking thread stops when the GUI is closed."""
+        self.hand_tracking_thread.volume_controller.midi.send_MIDI_stop()
         self.hand_tracking_thread.stop()
         self.hand_tracking_thread.wait()
         event.accept()
+
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

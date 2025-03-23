@@ -6,6 +6,8 @@ import math
 from ctypes import cast, POINTER
 from comtypes import CLSCTX_ALL
 from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume
+import mido
+from mido import Message, open_output, get_output_names
 
 class HandDetector:
     def __init__(self, mode=False, maxHands=2, detectionConf=0.5, trackConf=0.5):
@@ -96,6 +98,8 @@ class VolumeController:
         self.volBar = 400
         self.volPercent = 100
         self.color = (255, 0, 0)
+    # Create MIDI transmitter instance
+        self.midi = MIDITransmiter()
 
     def set_volume_by_hand_distance(self, lmList, img, detector):
         if len(lmList) >= 21:
@@ -108,7 +112,8 @@ class VolumeController:
 
                 fingers = detector.fingersUp()
                 if fingers and not fingers[4]:  # Pinky is down
-                    self.volume.SetMasterVolumeLevelScalar(volPercent / 100, None)
+                    #self.volume.SetMasterVolumeLevelScalar(volPercent / 100, None)
+                    self.midi.send_MIDI_volume(volPercent/100)
                     cv2.circle(img, (lineInfo[4], lineInfo[5]), 10, (0, 255, 0), cv2.FILLED)
                     self.color = (0, 255, 0)
                 else:
@@ -121,3 +126,52 @@ class VolumeController:
                 return volPercent
 
         return None
+
+
+from mido import Message, open_output, get_output_names
+
+class MIDITransmiter:
+    def __init__(self):
+        self.note = 60  # MIDI note number
+        self.playing_notes = set()
+        self.midi_out = None
+        self.connected = False
+        self.connect()
+
+    def connect(self):
+        ports = get_output_names()
+        print("🔍 Available MIDI Ports:", ports)
+        for port in ports:
+            if "Python to VCV 1" in port:
+                try:
+                    self.midi_out = open_output(port)
+                    self.connected = True
+                    print(f"✅ Connected to MIDI port: {port}")
+                    return
+                except Exception as e:
+                    print(f"❌ Failed to open MIDI port: {e}")
+        print("❌ MIDI connection failed. Port not found.")
+        self.connected = False
+
+    def send_MIDI_volume(self, MIDI_velocity):
+        if not self.connected:
+            print("⚠️ Cannot send MIDI — no connection.")
+            return
+        velocity = int(MIDI_velocity * 127)
+        self.midi_out.send(Message('note_on', note=self.note, velocity=velocity))
+        self.playing_notes.add(self.note)
+        print(f"🎵 Playing note {self.note} with velocity {velocity}")
+
+    def send_MIDI_stop(self):
+        if not self.connected:
+            print("⚠️ Cannot stop MIDI — not connected.")
+            return
+        for n in self.playing_notes:
+            # More compatible way to trigger note-off
+            self.midi_out.send(Message('note_on', note=n, velocity=0))
+        self.playing_notes.clear()
+
+        # Optional: still send CC123 if your VCV patch handles it
+        self.midi_out.send(Message('control_change', control=123, value=0))
+        print("🛑 All notes stopped.")
+

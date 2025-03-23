@@ -13,3 +13,8 @@ pip install -r requirements.txt
 4. Install loop midi ```https://www.tobias-erichsen.de/software/loopmidi.html```
 5. Create a port named "Python to VCV"
 6. Use a software of your choice that accepts midi
+
+* In case you get an error stating "DLL load failed while importing _framework_bindings: A dynamic link library (DLL) initialization routine failed."  Install globaly:
+```sh
+pip install msvc-runtime
+```

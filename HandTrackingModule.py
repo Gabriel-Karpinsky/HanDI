@@ -111,7 +111,7 @@ class VolumeController:
 
                 fingers = detector.fingersUp()
                 if fingers and not fingers[4]:
-                    self.midi.send_MIDI_volume(volPercent)
+                    self.midi.send_MIDI_volume(volPercent/100)
                     cv2.circle(img, (lineInfo[4], lineInfo[5]), 10, (0, 255, 0), cv2.FILLED)
                     self.color = (0, 255, 0)
                 else:

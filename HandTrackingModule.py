@@ -3,11 +3,14 @@ import mediapipe as mp
 import time
 import numpy as np
 import math
-from ctypes import cast, POINTER
-from comtypes import CLSCTX_ALL
-from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume
-import mido
+import os
+from dotenv import load_dotenv
 from mido import Message, open_output, get_output_names
+
+# Load environment variables
+ENV_FILE = os.path.join(os.path.dirname(__file__), '.env')
+load_dotenv(dotenv_path=ENV_FILE)
+MIDI_PORT_NAME = os.getenv("MIDI_PORT", "Python to VCV 1")
 
 class HandDetector:
     def __init__(self, mode=False, maxHands=2, detectionConf=0.5, trackConf=0.5):
@@ -17,7 +20,12 @@ class HandDetector:
         self.trackConf = trackConf
 
         self.mpHands = mp.solutions.hands
-        self.hands = self.mpHands.Hands(self.mode, self.maxHands, 1, self.detectionConf, self.trackConf)
+        self.hands = self.mpHands.Hands(
+            static_image_mode=self.mode,
+            max_num_hands=self.maxHands,
+            min_detection_confidence=self.detectionConf,
+            min_tracking_confidence=self.trackConf
+        )
         self.mpDraw = mp.solutions.drawing_utils
         self.tipIds = [4, 8, 12, 16, 20]
 
@@ -49,7 +57,7 @@ class HandDetector:
                     self.lmList.append([id, cx, cy])
                     if draw:
                         cv2.circle(img, (cx, cy), 5, (255, 0, 255), cv2.FILLED)
-                
+
                 xmin, xmax = min(xList), max(xList)
                 ymin, ymax = min(yList), max(yList)
                 bbox = (xmin, ymin, xmax, ymax)
@@ -64,13 +72,11 @@ class HandDetector:
         if not self.lmList:
             return []
 
-        # Thumb (horizontal comparison)
         fingers.append(1 if self.lmList[self.tipIds[0]][1] < self.lmList[self.tipIds[0] - 1][1] else 0)
 
-        # 4 Fingers (vertical comparison)
         for id in range(1, 5):
             fingers.append(1 if self.lmList[self.tipIds[id]][2] < self.lmList[self.tipIds[id] - 2][2] else 0)
-        print(fingers)
+
         return fingers
 
     def findDistance(self, p1, p2, img=None, draw=True):
@@ -89,16 +95,9 @@ class HandDetector:
 
 class VolumeController:
     def __init__(self):
-        devices = AudioUtilities.GetSpeakers()
-        interface = devices.Activate(IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
-        self.volume = cast(interface, POINTER(IAudioEndpointVolume))
-        self.volRange = self.volume.GetVolumeRange()
-        self.minVol = self.volRange[0]
-        self.maxVol = self.volRange[1]
         self.volBar = 400
         self.volPercent = 100
         self.color = (255, 0, 0)
-    # Create MIDI transmitter instance
         self.midi = MIDITransmiter()
 
     def set_volume_by_hand_distance(self, lmList, img, detector):
@@ -111,28 +110,23 @@ class VolumeController:
                 volPercent = 2 * round(volPercent / 2)
 
                 fingers = detector.fingersUp()
-                if fingers and not fingers[4]:  # Pinky is down
-                    #self.volume.SetMasterVolumeLevelScalar(volPercent / 100, None)
-                    self.midi.send_MIDI_volume(volPercent/100)
+                if fingers and not fingers[4]:
+                    self.midi.send_MIDI_volume(volPercent)
                     cv2.circle(img, (lineInfo[4], lineInfo[5]), 10, (0, 255, 0), cv2.FILLED)
                     self.color = (0, 255, 0)
                 else:
                     self.color = (255, 0, 0)
-                    return None  # <--- Do NOT return volume if it wasn't applied
+                    return None
 
                 self.volBar = np.interp(length, [45, 200], [400, 150])
                 self.volPercent = volPercent
-                print(volPercent)
                 return volPercent
 
         return None
 
-
-from mido import Message, open_output, get_output_names
-
 class MIDITransmiter:
     def __init__(self):
-        self.note = 60  # MIDI note number
+        self.note = 60
         self.playing_notes = set()
         self.midi_out = None
         self.connected = False
@@ -140,24 +134,24 @@ class MIDITransmiter:
 
     def connect(self):
         ports = get_output_names()
-        print("🔍 Available MIDI Ports:", ports)
+        print("Available MIDI Ports:", ports)
         for port in ports:
-            if "Python to VCV 1" in port:
+            if MIDI_PORT_NAME in port:
                 try:
                     self.midi_out = open_output(port)
                     self.connected = True
-                    print(f"✅ Connected to MIDI port: {port}")
+                    print(f"Connected to MIDI port: {port}")
                     return
                 except Exception as e:
-                    print(f"❌ Failed to open MIDI port: {e}")
-        print("❌ MIDI connection failed. Port not found.")
+                    print(f"Failed to open MIDI port: {e}")
+        print("MIDI connection failed. Port not found.")
         self.connected = False
 
     def send_MIDI_volume(self, MIDI_velocity):
         if not self.connected:
             print("⚠️ Cannot send MIDI — no connection.")
             return
-        velocity = int(MIDI_velocity * 127)
+        velocity = int(MIDI_velocity * 126+1)
         self.midi_out.send(Message('note_on', note=self.note, velocity=velocity))
         self.playing_notes.add(self.note)
         print(f"🎵 Playing note {self.note} with velocity {velocity}")
@@ -167,11 +161,7 @@ class MIDITransmiter:
             print("⚠️ Cannot stop MIDI — not connected.")
             return
         for n in self.playing_notes:
-            # More compatible way to trigger note-off
             self.midi_out.send(Message('note_on', note=n, velocity=0))
         self.playing_notes.clear()
-
-        # Optional: still send CC123 if your VCV patch handles it
         self.midi_out.send(Message('control_change', control=123, value=0))
         print("🛑 All notes stopped.")
-

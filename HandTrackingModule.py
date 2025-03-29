@@ -124,12 +124,22 @@ class VolumeController:
 
         return None
 
+class GestureCommand:
+    def __init__(self, gesture_id: str, action: callable):
+        self.gesture_id = gesture_id
+        self.action = action
+        
+    def trigger(self):
+        print(f"▶️ Triggering gesture '{self.gesture_id}'")
+        self.command()
+
 class MIDITransmiter:
     def __init__(self):
         self.note = 60
         self.playing_notes = set()
         self.midi_out = None
         self.connected = False
+        self.gesture_commands = {}
         self.connect()
 
     def connect(self):
@@ -146,6 +156,13 @@ class MIDITransmiter:
                     print(f"Failed to open MIDI port: {e}")
         print("MIDI connection failed. Port not found.")
         self.connected = False
+        
+    def register_gesture_command(self, gesture_id, action_callable):
+        self.gesture_commands[gesture_id] = GestureCommand(gesture_id, action_callable)
+
+    def trigger_gesture(self, gesture_id):
+        if gesture_id in self.gesture_commands:
+            self.gesture_commands[gesture_id].trigger()
 
     def send_MIDI_volume(self, MIDI_velocity):
         if not self.connected:

@@ -155,6 +155,23 @@ class HandTrackingGUI(QWidget):
         self.settings_button = QPushButton("Settings")
         self.settings_button.clicked.connect(self.open_settings)
 
+        # Gesture selection UI
+        self.gesture_label = QLabel("Select Gesture:")
+        self.gesture_combo = QComboBox()
+        self.gesture_combo.addItems(["Pinch", "Fist"])
+        self.gesture_combo.currentTextChanged.connect(self.gesture_changed)
+
+        self.midi_label = QLabel("Select MIDI Command:")
+        self.midi_combo = QComboBox()
+        # Define mapping for available MIDI commands per gesture
+        self.gesture_midi_options = {
+            "Pinch": ["Volume Control", "Modulation"],
+            "Fist": ["Mute", "Play/Pause"]
+        }
+        # Set initial MIDI options for "Pinch"
+        self.midi_combo.addItems(self.gesture_midi_options["Pinch"])
+        self.midi_combo.currentTextChanged.connect(self.midi_changed)
+
         # STOP Button
         self.stop_button = QPushButton("STOP")
         self.stop_button.clicked.connect(self.send_MIDI_stop)
@@ -174,6 +191,11 @@ class HandTrackingGUI(QWidget):
         layout.addWidget(self.settings_button)
         layout.addWidget(self.conf_label)
         layout.addWidget(self.conf_slider)
+        # Add gesture selection widgets
+        layout.addWidget(self.gesture_label)
+        layout.addWidget(self.gesture_combo)
+        layout.addWidget(self.midi_label)
+        layout.addWidget(self.midi_combo)
         layout.addWidget(self.stop_button)
         self.setLayout(layout)
 
@@ -187,15 +209,26 @@ class HandTrackingGUI(QWidget):
         self.pTime = 0
         self.cTime = 0
 
+    def gesture_changed(self, gesture):
+        # When the gesture changes, update the MIDI command options accordingly.
+        self.midi_combo.clear()
+        options = self.gesture_midi_options.get(gesture, [])
+        self.midi_combo.addItems(options)
+        # Update the thread settings with the current gesture and first MIDI command option.
+        self.hand_tracking_thread.update_gesture_settings(gesture, self.midi_combo.currentText())
+
+    def midi_changed(self, midi_command):
+        # Update the thread with the new MIDI command selection.
+        self.hand_tracking_thread.update_gesture_settings(self.gesture_combo.currentText(), midi_command)
+
     def display_frame(self, frame):
         frame = cv2.resize(frame, (self.video_label.width(), self.video_label.height()), interpolation=cv2.INTER_AREA)
         frame = cv2.resize(frame, (640, 480))
         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        #self.cTime = time.time()
-        #self.fps = 1 / (self.cTime - self.pTime)
-        #self.pTime = self.cTime
-
-        #frame = cv2.putText(frame, f'FPS: {int(self.fps)}', (40, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 3)
+        self.cTime = time.time()
+        self.fps = 1 / (self.cTime - self.pTime)
+        self.pTime = self.cTime
+        frame = cv2.putText(frame, f'FPS: {int(self.fps)}', (40, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 3)
         h, w, ch = frame.shape
         bytes_per_line = ch * w
         qt_img = QImage(frame.data, w, h, bytes_per_line, QImage.Format.Format_RGB888)

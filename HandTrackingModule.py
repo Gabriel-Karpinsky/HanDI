@@ -165,3 +165,19 @@ class MIDITransmiter:
         self.playing_notes.clear()
         self.midi_out.send(Message('control_change', control=123, value=0))
         print("🛑 All notes stopped.")
+
+    def send_MIDI_fist(self):
+        if not self.connected:
+            print("⚠️ Cannot send MIDI — no connection.")
+            return
+        # Send a binary signal for the fist gesture.
+        self.midi_out.send(Message('note_on', note=self.note, velocity=127))
+        print("🎵 Fist MIDI command sent.")
+
+    def send_MIDI_play_pause(self):
+        if not self.connected:
+            print("⚠️ Cannot send MIDI — no connection.")
+            return
+        # For example, send a control change message for play/pause.
+        self.midi_out.send(Message('control_change', control=12, value=127))
+        print("🎵 Play/Pause MIDI command sent.")

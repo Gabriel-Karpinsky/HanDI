@@ -9,12 +9,6 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtGui import QImage, QPixmap
 from PyQt6.QtCore import QThread, pyqtSignal, Qt
-
-# Make sure this import points to the updated "HandTrackingModule.py",
-# which includes:
-#   - HandDetector (with findDistance, is_fist, etc.)
-#   - MIDITransmiter
-#   - BinaryGesture, ContinuousGesture, GestureCollection
 import HandTrackingModule as htm
 
 # Load environment variables from .env
@@ -22,9 +16,6 @@ ENV_FILE = os.path.join(os.path.dirname(__file__), '.env')
 load_dotenv(dotenv_path=ENV_FILE)
 
 def update_env_variable(key, value):
-    """
-    Helper to update a key in the .env file and reload environment variables.
-    """
     set_key(ENV_FILE, key, str(value))
     load_dotenv(ENV_FILE, override=True)
 
@@ -51,58 +42,35 @@ def get_available_cameras(max_index=10):
                 cap.release()
     return available
 
-
 # -----------------------------------------------------------------------
 #  GESTURE SETTINGS UI
 # -----------------------------------------------------------------------
-#
-# We have 3 gestures in this example:
-#  1) Bounding Box Volume (continuous)
-#  2) Pinch (continuous)
-#  3) Fist (binary)
-#
-# For continuous gestures, we also allow the user to pick which "MIDI param"
-# is being sent: e.g., "Volume", "Octave", "Modulation," etc.
-
-AVAILABLE_GESTURES = ["Bounding Box Volume", "Pinch", "Fist"]
-# Which continuous commands do we offer in the UI?
+AVAILABLE_GESTURES = ["Bounding Box", "Pinch", "Fist"]
 AVAILABLE_CONTINUOUS_MIDI_PARAMS = ["Volume", "Octave", "Modulation"]
 
 class GestureSettingRow(QWidget):
-    """
-    A single row for choosing:
-      - Gesture (BoundingBoxVolume, Pinch, or Fist)
-      - If it's a continuous gesture, also choose which MIDI param to send.
-      - Active/Inactive checkbox
-      - Remove button
-    """
     def __init__(self, parent=None):
         super().__init__(parent)
-
         self.layout = QHBoxLayout()
 
-        # -- 1) Gesture combo --
         self.gesture_combo = QComboBox()
         self.gesture_combo.addItems(AVAILABLE_GESTURES)
         self.gesture_combo.currentTextChanged.connect(self.on_gesture_changed)
         self.layout.addWidget(self.gesture_combo)
 
         self.channel_combo = QComboBox()
-        self.channel_combo.addItems([str(i) for i in range(1, 17)])  # MIDI channels 1–16
+        self.channel_combo.addItems([str(i) for i in range(1, 17)])
         self.layout.addWidget(QLabel("Ch:"))
         self.layout.addWidget(self.channel_combo)
 
-        # -- 2) Continuous MIDI param combo (hidden unless gesture is continuous) --
         self.continuous_param_combo = QComboBox()
         self.continuous_param_combo.addItems(AVAILABLE_CONTINUOUS_MIDI_PARAMS)
         self.layout.addWidget(self.continuous_param_combo)
 
-        # -- 3) Active/Inactive --
         self.active_checkbox = QCheckBox("Active")
         self.active_checkbox.setChecked(True)
         self.layout.addWidget(self.active_checkbox)
 
-        # -- 4) Remove button --
         self.remove_button = QPushButton("Remove")
         self.layout.addWidget(self.remove_button)
 
@@ -110,53 +78,34 @@ class GestureSettingRow(QWidget):
         self.on_gesture_changed(self.gesture_combo.currentText())
 
     def on_gesture_changed(self, gesture):
-        """
-        Show or hide the 'continuous_param_combo' depending on
-        whether the chosen gesture is continuous or binary.
-        """
-        if gesture in ["Bounding Box Volume", "Pinch"]:
-            # Continuous => show the param combo
+        if gesture in ["Bounding Box", "Pinch"]:
             self.continuous_param_combo.show()
         else:
-            # e.g. Fist => binary => hide the param combo
             self.continuous_param_combo.hide()
 
     def get_settings(self):
-        """
-        Return all the user's choices in a dictionary.
-        For continuous gestures, we also store 'midi_param'.
-        For binary gestures, 'midi_param' can be None.
-        """
         gesture_name = self.gesture_combo.currentText()
-        if gesture_name in ["Bounding Box Volume", "Pinch"]:
+        if gesture_name in ["Bounding Box", "Pinch"]:
             midi_param = self.continuous_param_combo.currentText()
         else:
             midi_param = None
-
         return {
-        "gesture": gesture_name,
-        "active": self.active_checkbox.isChecked(),
-        "midi_param": midi_param,
-        "channel": int(self.channel_combo.currentText()) - 1  # Convert to 0-based index
-    }
-
+            "gesture": gesture_name,
+            "active": self.active_checkbox.isChecked(),
+            "midi_param": midi_param,
+            "channel": int(self.channel_combo.currentText()) - 1
+        }
 
 class GestureSettingsWidget(QWidget):
-    """
-    A widget that can contain multiple GestureSettingRows.
-    Each row is one gesture the user wants to enable.
-    """
     def __init__(self, parent=None):
         super().__init__(parent)
         self.layout = QVBoxLayout()
         self.setLayout(self.layout)
         self.rows = []
 
-        # Button to add new rows
         self.add_button = QPushButton("+ Add Gesture")
         self.add_button.clicked.connect(self.add_row)
 
-        # Add an initial row
         self.add_row()
         self.layout.addWidget(self.add_button)
 
@@ -173,38 +122,22 @@ class GestureSettingsWidget(QWidget):
             row.setParent(None)
 
     def get_all_settings(self):
-        """
-        Return a list of dicts from each row's .get_settings().
-        """
         return [r.get_settings() for r in self.rows]
-
 
 # -----------------------------------------------------------------------
 #  HAND TRACKING THREAD
 # -----------------------------------------------------------------------
 
 class HandTrackingThread(QThread):
-    """
-    Runs in a background thread:
-      - Captures camera frames
-      - Detects hand landmarks with HandDetector
-      - Calls .update(...) on a GestureCollection
-      - Emits frames for the GUI to display
-    """
     frame_signal = pyqtSignal(np.ndarray)
 
     def __init__(self, camera_index=0, detection_conf=0.7, parent=None):
         super().__init__(parent)
         self.camera_index = camera_index
         self.detection_conf = detection_conf
-
-        # Create our hand detector & MIDI
         self.detector = htm.HandDetector(detectionConf=self.detection_conf)
         self.midi = htm.MIDITransmiter()
-
-        # Start with an empty GestureCollection
         self.gesture_collection = htm.GestureCollection([])
-
         self.running = True
         self.cap = None
         self.init_camera()
@@ -214,12 +147,9 @@ class HandTrackingThread(QThread):
             self.cap.release()
         self.cap = cv2.VideoCapture(self.camera_index)
         if not self.cap.isOpened():
-            print(f"⚠️ ERROR: Could not open camera index {self.camera_index}")
+            print(f"\u26a0\ufe0f ERROR: Could not open camera index {self.camera_index}")
 
     def set_gesture_collection(self, gesture_collection: htm.GestureCollection):
-        """
-        GUI calls this after user clicks "Apply Gesture Settings".
-        """
         self.gesture_collection = gesture_collection
 
     def update_camera_index(self, new_index):
@@ -235,38 +165,29 @@ class HandTrackingThread(QThread):
 
     def run(self):
         while self.running:
-            success, frame = self.cap.read()
-            if not success:
-                print("⚠️ ERROR: Failed to capture frame. Reinitializing camera...")
+            try:
+                success, frame = self.cap.read()
+                if not success:
+                    print("\u26a0\ufe0f ERROR: Failed to capture frame. Reinitializing camera...")
+                    self.init_camera()
+                    continue
+
+                frame = cv2.flip(frame, 1)
+                frame = self.detector.findHands(frame, draw=True)
+                lmList, _ = self.detector.findPosition(frame, draw=True)
+
+                if len(lmList) >= 21:
+                    dist, frame, _ = self.detector.findDistance(4, 8, frame, draw=True)
+
+                self.gesture_collection.update(lmList)
+                self.frame_signal.emit(frame)
+            except Exception as e:
+                print(f"❌ Exception in hand tracking thread: {e}")
                 self.init_camera()
-                continue
-
-            # Flip horizontally
-            frame = cv2.flip(frame, 1)
-
-            # First, find hands + draw them
-            frame = self.detector.findHands(frame, draw=True)
-            lmList, _ = self.detector.findPosition(frame, draw=True)
-
-            # If you want to draw a line between thumb & index for pinch:
-            # we can do that here *before* we do the gesture update
-            # so we have a visual. For instance:
-            if len(lmList) >= 21:
-                # We pass draw=True to see the line
-                dist, frame, _ = self.detector.findDistance(4, 8, frame, draw=True)
-
-            # Let the gesture collection update (sends MIDI if needed)
-            self.gesture_collection.update(lmList)
-
-            # Send the final frame to the GUI
-            self.frame_signal.emit(frame)
-
         self.cap.release()
 
     def stop(self):
         self.running = False
-        # The GUI will call wait().
-
 
 # -----------------------------------------------------------------------
 #  MAIN GUI
@@ -278,15 +199,14 @@ class HandTrackingGUI(QWidget):
         self.setWindowTitle("Hand Tracking MIDI Controller")
         self.setGeometry(100, 100, 900, 700)
 
-        # 1) Video display
         self.video_label = QLabel("Video Feed")
         self.video_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.video_label.setMinimumSize(640, 480)
 
-        # 2) A label for feedback (e.g., volume, pinch, etc.)
-        self.feedback_label = QLabel("Gesture Value: ???")
+        # Dynamic feedback layout
+        self.feedback_layout = QHBoxLayout()
+        self.feedback_labels = {}
 
-        # 3) Camera selection
         self.camera_combo = QComboBox()
         cameras = get_available_cameras()
         for idx, name in cameras:
@@ -297,7 +217,6 @@ class HandTrackingGUI(QWidget):
             self.camera_combo.setCurrentIndex(i_cam)
         self.camera_combo.currentIndexChanged.connect(self.on_camera_changed)
 
-        # 4) Detection confidence
         self.conf_slider = QSlider(Qt.Orientation.Horizontal)
         self.conf_slider.setRange(1, 100)
         slider_val = int(float(os.getenv("DETECTION_CONF", 0.7)) * 100)
@@ -305,19 +224,15 @@ class HandTrackingGUI(QWidget):
         self.conf_slider.valueChanged.connect(self.on_conf_changed)
         self.conf_label = QLabel(f"Detection Confidence: {slider_val}%")
 
-        # 5) Gesture settings widget
         self.gesture_settings_widget = GestureSettingsWidget()
         self.apply_button = QPushButton("Apply Gesture Settings")
         self.apply_button.clicked.connect(self.on_apply_gestures)
 
-        # 6) STOP button (MIDI all notes off)
         self.stop_button = QPushButton("MIDI STOP")
         self.stop_button.setStyleSheet("background-color: red; color: white; font-weight: bold;")
         self.stop_button.clicked.connect(self.on_midi_stop)
 
-        # Lay out the UI
         layout = QVBoxLayout()
-        # Top row: camera + confidence
         cam_layout = QHBoxLayout()
         cam_layout.addWidget(QLabel("Camera:"))
         cam_layout.addWidget(self.camera_combo)
@@ -326,23 +241,18 @@ class HandTrackingGUI(QWidget):
         layout.addLayout(cam_layout)
 
         layout.addWidget(self.video_label)
-        layout.addWidget(self.feedback_label)
+        layout.addLayout(self.feedback_layout)
         layout.addWidget(self.gesture_settings_widget)
         layout.addWidget(self.apply_button)
         layout.addWidget(self.stop_button)
         self.setLayout(layout)
 
-        # Start the hand tracking thread
         self.hand_tracking_thread = HandTrackingThread(
             camera_index=current_cam,
             detection_conf=slider_val / 100.0
         )
         self.hand_tracking_thread.frame_signal.connect(self.display_frame)
         self.hand_tracking_thread.start()
-
-    # -----------------------
-    #   UI EVENT HANDLERS
-    # -----------------------
 
     def on_camera_changed(self):
         new_idx = self.camera_combo.currentData()
@@ -352,14 +262,17 @@ class HandTrackingGUI(QWidget):
         new_conf = value / 100.0
         self.conf_label.setText(f"Detection Confidence: {value}%")
         self.hand_tracking_thread.set_detection_conf(new_conf)
-                    
+
     def on_apply_gestures(self):
-        """
-        Builds a new GestureCollection based on user selections.
-        Each row is either a continuous or binary gesture, with a chosen MIDI param for continuous.
-        """
         settings_list = self.gesture_settings_widget.get_all_settings()
         print("Applying gesture settings:", settings_list)
+
+        while self.feedback_layout.count():
+            item = self.feedback_layout.takeAt(0)
+            widget = item.widget()
+            if widget is not None:
+                widget.setParent(None)
+        self.feedback_labels = {}
 
         new_gestures = []
         detector = self.hand_tracking_thread.detector
@@ -372,19 +285,21 @@ class HandTrackingGUI(QWidget):
             param = s["midi_param"]
             chan = s["channel"]
 
-            if name == "Bounding Box Volume":
+            if name == "Bounding Box":
                 def bounding_box_func(lmList):
                     detector.lmList = lmList
                     return detector.get_bounding_box_volume()
 
-                def bounding_box_callback(value, ch=chan):
-                    if param == "Volume":
-                        midi.send_volume(value, channel=ch)
-                    elif param == "Octave":
-                        midi.send_octave(value, channel=ch)
-                    elif param == "Modulation":
-                        midi.send_modulation(value, channel=ch)
-                    self.feedback_label.setText(f"BBox {param}: {int(value*100)}%")
+                feedback_key = f"{name}_{param}_ch{chan}"
+                label = QLabel(f"{name} {param}: ???")
+                self.feedback_labels[feedback_key] = label
+                self.feedback_layout.addWidget(label)
+
+                def bounding_box_callback(value, ch=chan, key=feedback_key, name=name, param=param):
+                    cc_map = {"Volume": 7, "Octave": 15, "Modulation": 1}
+                    midi.send_cc(value, control=cc_map[param], channel=ch)
+                    self.feedback_labels[key].setText(f"{name} {param}: {int(value * 100)}%")
+
 
                 gesture_obj = htm.ContinuousGesture(bounding_box_func, bounding_box_callback)
                 new_gestures.append(gesture_obj)
@@ -400,14 +315,15 @@ class HandTrackingGUI(QWidget):
                     val = np.interp(dist, [20, 220], [0, 1])
                     return val
 
-                def pinch_callback(value, ch=chan):
-                    if param == "Volume":
-                        midi.send_volume(value, channel=ch)
-                    elif param == "Octave":
-                        midi.send_octave(value, channel=ch)
-                    elif param == "Modulation":
-                        midi.send_modulation(value, channel=ch)
-                    self.feedback_label.setText(f"Pinch {param}: {int(value*100)}%")
+                feedback_key = f"{name}_{param}_ch{chan}"
+                label = QLabel(f"{name} {param}: ???")
+                self.feedback_labels[feedback_key] = label
+                self.feedback_layout.addWidget(label)
+
+                def pinch_callback(value, ch=chan, key=feedback_key, name=name, param=param):
+                    cc_map = {"Volume": 7, "Octave": 15, "Modulation": 1}
+                    midi.send_cc(value, control=cc_map[param], channel=ch)
+                    self.feedback_labels[key].setText(f"{name} {param}: {int(value * 100)}%")
 
                 gesture_obj = htm.ContinuousGesture(pinch_func, pinch_callback)
                 new_gestures.append(gesture_obj)
@@ -419,7 +335,7 @@ class HandTrackingGUI(QWidget):
 
                 def fist_trigger():
                     midi.send_fist()
-                    self.feedback_label.setText("Fist Triggered!")
+                    print("Fist Triggered!")
 
                 gesture_obj = htm.BinaryGesture(fist_bool, fist_trigger)
                 new_gestures.append(gesture_obj)
@@ -431,9 +347,6 @@ class HandTrackingGUI(QWidget):
         self.hand_tracking_thread.midi.send_stop()
 
     def display_frame(self, frame):
-        """
-        Show the latest camera frame from the thread.
-        """
         frame = cv2.resize(frame, (self.video_label.width(), self.video_label.height()), interpolation=cv2.INTER_AREA)
         rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         h, w, ch = rgb.shape
@@ -442,13 +355,9 @@ class HandTrackingGUI(QWidget):
         self.video_label.setPixmap(QPixmap.fromImage(qt_img))
 
     def closeEvent(self, event):
-        """
-        On close, stop the thread.
-        """
         self.hand_tracking_thread.stop()
         self.hand_tracking_thread.wait()
         event.accept()
-
 
 # -----------------------------------------------------------------------
 #  MAIN

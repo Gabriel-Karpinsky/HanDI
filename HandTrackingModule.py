@@ -182,20 +182,16 @@ class MIDITransmiter:
         print("MIDI connection failed. Port not found.")
 
     def send_stop(self):
-        """
-        Sends an 'all notes off' or 'all sound off' message.
-        """
         if not self.connected:
             print("⚠️ Can't send stop — no connection.")
             return
-        # 123 => "All notes off"
-        self.midi_out.send(Message('control_change', control=120, value=0))
-        self.midi_out.send(Message('control_change', control=121, value=0))
-        self.midi_out.send(Message('control_change', control=123, value=0))
-        print("🛑 All notes stopped.")
+        for ch in range(16):
+            for note in range(128):
+                self.midi_out.send(Message('note_off', note=note, velocity=0, channel=ch))
+        print("🛑 Sent note_off to all notes on all channels.")
+
 
     def send_volume(self, fraction: float, channel=0):
-
         if not self.connected:
             print("⚠️ Can't send volume — no connection.")
             return
@@ -215,6 +211,14 @@ class MIDITransmiter:
         val = int(fraction * 127)
         self.midi_out.send(Message('control_change',control=1, channel=channel, value=val))
         print(f"Modulation => CC1, value={val}")
+    
+    def send_cc(self, fraction: float, control: int, channel=0):
+        if not self.connected:
+            print(f"⚠️ Can't send CC{control} — no connection.")
+            return
+        value = int(fraction * 127)
+        self.midi_out.send(Message('control_change', control=control, channel=channel, value=value))
+        print(f"🎛️ CC{control}, ch{channel} => value={value}")
 
 
     def send_fist(self):

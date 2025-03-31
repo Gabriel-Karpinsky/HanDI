@@ -6,7 +6,7 @@ import os
 from dotenv import load_dotenv
 from mido import Message, open_output, get_output_names
 
-# Load environment variables
+# Load environment variable
 ENV_FILE = os.path.join(os.path.dirname(__file__), '.env')
 load_dotenv(dotenv_path=ENV_FILE)
 MIDI_PORT_NAME = os.getenv("MIDI_PORT", "Python to VCV 1")
@@ -32,6 +32,8 @@ class HandDetector:
         self.mpDraw = mp.solutions.drawing_utils
         self.lmList = []  # landmarks for the current frame
         self.results = None
+        self.prev_norm_length = None
+        self.prev_length = None
 
     def findHands(self, img, draw=True):
         """
@@ -61,18 +63,37 @@ class HandDetector:
         return fingers
 
     def findDistance(self, p1, p2, img=None, draw=True):
+        threshold = 0.1
+        if not self.lmList or len(self.lmList) < 21:
+            return None, img, None
+
         x1, y1 = self.lmList[p1][1:]
         x2, y2 = self.lmList[p2][1:]
         cx, cy = (x1 + x2) // 2, (y1 + y2) // 2
 
-        if draw and img is not None:
-            cv2.line(img, (x1, y1), (x2, y2), (255, 0, 255), 2)
-            cv2.circle(img, (x1, y1), 10, (255, 0, 255), cv2.FILLED)
-            cv2.circle(img, (x2, y2), 10, (255, 0, 255), cv2.FILLED)
-            cv2.circle(img, (cx, cy), 10, (0, 255, 0), cv2.FILLED)
+        length = np.hypot(x2 - x1, y2 - y1)
 
-        length = math.hypot(x2 - x1, y2 - y1)
+        # Compute hand width for normalization
+        x_values = [pt[1] for pt in self.lmList]
+        hand_width = max(x_values) - min(x_values)
+
+
+        # Ensure hand width is valid
+        if hand_width < 50:
+            return self.prev_length, img, None  # Return last known value
+
+        # Normalize distance
+        normalized_length = length / hand_width
+
+        # Check if normalized length change is significant
+        if self.prev_norm_length is None or abs(normalized_length - self.prev_norm_length) > threshold:
+            self.prev_norm_length = normalized_length  # Update stored normalized length
+            self.prev_length = length  # Update stored raw length
+        else:
+            length = self.prev_length  # Use previous value if change is small
+
         return length, img, (x1, y1, x2, y2, cx, cy)
+
     
     def findPosition(self, img, handNo=0, draw=True):
         """

@@ -57,7 +57,7 @@ class HandDetector:
 
         for id in range(1, 5):
             fingers.append(1 if self.lmList[self.tipIds[id]][2] < self.lmList[self.tipIds[id] - 2][2] else 0)
-
+        print(f'{fingers}')
         return fingers
 
     def findDistance(self, p1, p2, img=None, draw=True):
@@ -123,12 +123,12 @@ class HandDetector:
         area = (max(xs) - min(xs)) * (max(ys) - min(ys))
 
         # Simple range check to ignore extremely small or large detection
-        if area < 1000 or area > 30000:
+        if area < 250 or area > 30000:
             return None
 
         # Map area range [1000..30000] to [0..1]
         # Adjust numbers as needed for your camera/distance
-        value = np.interp(area, [1000, 30000], [0, 1])
+        value = np.interp(area, [500, 30000], [0, 1])
         return value
 
 

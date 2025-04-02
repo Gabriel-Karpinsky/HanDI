@@ -172,5 +172,3 @@ If you have a suggestion that would improve this project, please fork the reposi
 
 <!-- LICENSE -->
 ## License
-
-Distributed under the MIT License. See `LICENSE.txt` for 

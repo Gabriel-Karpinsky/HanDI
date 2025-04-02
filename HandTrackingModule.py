@@ -16,7 +16,7 @@ class HandDetector:
     Handles all low-level hand detection with MediaPipe, plus the actual
     geometry or logic for each gesture (bounding box volume, pinch, fist, etc.)
     """
-    def __init__(self, mode=False, maxHands=2, detectionConf=0.5, trackConf=0.5):
+    def __init__(self, mode=False, maxHands=2, detectionConf=0.5, trackConf=0.5, model_path = None):
         self.mode = mode
         self.maxHands = maxHands
         self.detectionConf = detectionConf
@@ -32,6 +32,32 @@ class HandDetector:
         self.mpDraw = mp.solutions.drawing_utils
         self.lmList = []  # landmarks for the current frame
         self.results = None
+
+        # Existing initialization...
+        self.classifier = None
+        self.labels = []
+        if model_path:
+            self.load_model(model_path)
+    
+    def load_model(self, model_path):
+        """Load Keras model and labels"""
+        from cvzone.ClassificationModule import Classifier
+        self.classifier = Classifier(f"{model_path}/keras_model.h5", 
+                                   f"{model_path}/labels.txt")
+        with open(f"{model_path}/labels.txt") as f:
+            self.labels = [line.strip() for line in f.readlines()]
+    
+    def predict_gesture(self, img):
+        """Run model prediction on preprocessed hand image"""
+        if not self.classifier:
+            return None
+        
+        # Preprocess image same as your training script
+        imgWhite = np.ones((300, 300, 3), np.uint8) * 255
+        # ... (add your image cropping/resizing logic from the training script)
+        
+        prediction, index = self.classifier.getPrediction(imgWhite)
+        return self.labels[index] if index < len(self.labels) else None
 
     def findHands(self, img, draw=True):
         """
@@ -50,14 +76,17 @@ class HandDetector:
 
     def fingersUp(self):
         fingers = []
+        
         if not self.lmList:
             return []
-
+        
+        # Thumb (works for both hands)
         fingers.append(1 if self.lmList[self.tipIds[0]][1] < self.lmList[self.tipIds[0] - 1][1] else 0)
-
+        
+        # Other fingers
         for id in range(1, 5):
             fingers.append(1 if self.lmList[self.tipIds[id]][2] < self.lmList[self.tipIds[id] - 2][2] else 0)
-        print(f'{fingers}')
+        
         return fingers
 
     def findDistance(self, p1, p2, img=None, draw=True):
@@ -155,6 +184,46 @@ class HandDetector:
         if w < (h * 0.5):
             return True
         return False
+    
+    def is_victory(self) -> bool:
+        # Detects victory/peace sign (index and middle fingers up, others down)
+        if not self.lmList or len(self.lmList) < 21:
+            return False
+        
+        # Check extended fingers using relative positions
+        points = [
+            (self.tipIds[1], self.tipIds[1]-2),  # Index finger
+            (self.tipIds[2], self.tipIds[2]-2),  # Middle finger
+            (self.tipIds[3], self.tipIds[3]-2),  # Ring finger
+            (self.tipIds[4], self.tipIds[4]-2)   # Pinky
+        ]
+        
+        # Victory requires:
+        # # - Index and middle fingers extended (tip above joint)
+        # # - Ring and pinky folded (tip below joint)
+        return (self.lmList[points[0][0]][2] < self.lmList[points[0][1]][2] and  # Index up
+            self.lmList[points[1][0]][2] < self.lmList[points[1][1]][2] and  # Middle up
+            self.lmList[points[2][0]][2] > self.lmList[points[2][1]][2] and  # Ring down
+            self.lmList[points[3][0]][2] > self.lmList[points[3][1]][2])     # Pinky down
+    
+    def is_thumbs_up(self) -> bool:
+        # Detects thumbs up (thumb extended, other fingers closed)"""
+        if not self.lmList or len(self.lmList) < 21:
+            return False
+        
+        # Check thumb position relative to wrist
+        thumb_tip = self.lmList[4]
+        wrist = self.lmList[0]
+        
+        # Thumbs up requires:
+        # # 1. Thumb tip is above wrist (y-coordinate)
+        # # 2. Other fingers are folded
+        other_fingers_folded = all(
+            self.lmList[self.tipIds[i]][2] > self.lmList[self.tipIds[i]-2][2]
+            for i in range(1, 5)
+        )
+        
+        return thumb_tip[2] < wrist[2] and other_fingers_folded
 
 
 class MIDITransmiter:

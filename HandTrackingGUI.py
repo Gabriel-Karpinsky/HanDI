@@ -45,8 +45,9 @@ def get_available_cameras(max_index=10):
 # -----------------------------------------------------------------------
 #  GESTURE SETTINGS UI
 # -----------------------------------------------------------------------
-AVAILABLE_GESTURES = ["Bounding Box", "Pinch", "Fist"]
+AVAILABLE_GESTURES = ["Bounding Box", "Pinch", "Fist", "Victory", "Thumbs Up"]
 AVAILABLE_CONTINUOUS_MIDI_PARAMS = ["Volume", "Octave", "Modulation"]
+AVAILABLE_MODEL_GESTURES = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "4", "5"]
 
 class GestureSettingRow(QWidget):
     def __init__(self, parent=None):
@@ -95,6 +96,13 @@ class GestureSettingRow(QWidget):
             "midi_param": midi_param,
             "channel": int(self.channel_combo.currentText()) - 1
         }
+    
+class ModelGestureSettingRow(GestureSettingRow):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.gesture_combo.clear()
+        self.gesture_combo.addItems(AVAILABLE_MODEL_GESTURES)
+        self.continuous_param_combo.show()  # Always show for model gestures
 
 class GestureSettingsWidget(QWidget):
     def __init__(self, parent=None):
@@ -108,6 +116,9 @@ class GestureSettingsWidget(QWidget):
 
         self.add_row()
         self.layout.addWidget(self.add_button)
+    
+    def add_row(self, use_model=False):
+        row = ModelGestureSettingRow() if use_model else GestureSettingRow()
 
     def add_row(self):
         row = GestureSettingRow()
@@ -340,6 +351,35 @@ class HandTrackingGUI(QWidget):
                 gesture_obj = htm.BinaryGesture(fist_bool, fist_trigger)
                 new_gestures.append(gesture_obj)
 
+            elif name == "Victory":
+                def victory_bool(lmList):
+                    detector.lmList = lmList
+                    return detector.is_victory()
+                
+                def victory_trigger():
+                    midi.send_cc(1, control=20, channel=chan)  # CC20 for victory
+                    print("Victory Triggered!")
+                    
+                gesture_obj = htm.BinaryGesture(victory_bool, victory_trigger)
+                new_gestures.append(gesture_obj)
+                
+            elif name == "Thumbs Up":
+                def thumbs_up_bool(lmList):
+                    detector.lmList = lmList
+                    return detector.is_thumbs_up()
+                
+                def thumbs_up_trigger():
+                    midi.send_cc(1, control=21, channel=chan)  # CC21 for thumbs up
+                    print("Thumbs Up Triggered!")
+                
+                feedback_key = f"{name}_{param}_ch{chan}"
+                label = QLabel(f"{name} {param}: ???")
+                self.feedback_labels[feedback_key] = label
+                self.feedback_layout.addWidget(label)
+                    
+                gesture_obj = htm.BinaryGesture(thumbs_up_bool, thumbs_up_trigger)
+                new_gestures.append(gesture_obj)
+
         collection = htm.GestureCollection(new_gestures)
         self.hand_tracking_thread.set_gesture_collection(collection)
 
@@ -358,6 +398,7 @@ class HandTrackingGUI(QWidget):
         self.hand_tracking_thread.stop()
         self.hand_tracking_thread.wait()
         event.accept()
+
 
 # -----------------------------------------------------------------------
 #  MAIN

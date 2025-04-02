@@ -1,16 +1,16 @@
 # HanDI
-
+<!--
 [![Contributors][contributors-shield]][contributors-url]
 [![Forks][forks-shield]][forks-url]
 [![Stargazers][stars-shield]][stars-url]
 [![Issues][issues-shield]][issues-url]
 [![MIT License][license-shield]][license-url]
 [![LinkedIn][linkedin-shield]][linkedin-url]
-
+-->
 <!-- PROJECT LOGO -->
 <br />
 <div align="center">
-  <a href="https://github.com/Gabriel-Karpinsky/Project-Robots-Everywhere-Group-15">
+  <a href="https://github.com/Gabriel-Karpinsky/Handi">
     <img src="images/logo.png" alt="Logo" width="80" height="80">
   </a>
 
@@ -19,14 +19,14 @@
   <p align="center">
     A brief description of what this project does and who it's for.
     <br />
-    <a href="https://github.com/Gabriel-Karpinsky/Project-Robots-Everywhere-Group-15"><strong>Explore the docs »</strong></a>
+    <a href="https://github.com/Gabriel-Karpinsky/HanDI"><strong>Explore the docs »</strong></a>
     <br />
     <br />
-    <a href="https://github.com/Gabriel-Karpinsky/Project-Robots-Everywhere-Group-15">View Demo</a>
+    <a href="https://github.com/Gabriel-Karpinsky/HanDI">View Demo</a>
     ·
-    <a href="https://github.com/Gabriel-Karpinsky/Project-Robots-Everywhere-Group-15/issues">Report Bug</a>
+    <a href="https://github.com/Gabriel-Karpinsky/HanDI/issues">Report Bug</a>
     ·
-    <a href="https://github.com/Gabriel-Karpinsky/Project-Robots-Everywhere-Group-15/issues">Request Feature</a>
+    <a href="https://github.com/Gabriel-Karpinsky/HanDI/issues">Request Feature</a>
   </p>
 </div>
 
@@ -91,11 +91,11 @@ Ensure you have the following installed:
 
 1. **Clone the repository**:
    ```sh
-   git clone https://github.com/Gabriel-Karpinsky/Project-Robots-Everywhere-Group-15.git
+   git clone https://github.com/Gabriel-Karpinsky/HanDI.git
    ```
 2. **Navigate to the project directory**:
    ```sh
-   cd Project-Robots-Everywhere-Group-15
+   cd HanDI
    ```
 3. **Create a virtual environment**:
    ```sh
@@ -151,7 +151,7 @@ Outline the planned features and improvements for the project.
 - [ ] Feature 2
 - [ ] Feature 3
 
-See the [open issues](https://github.com/Gabriel-Karpinsky/Project-Robots-Everywhere-Group-15/issues) for a full list of proposed features and known issues.
+See the [open issues](https://github.com/Gabriel-Karpinsky/HanDI/issues) for a full list of proposed features and known issues.
 
 <p align="right">(<a href="#top">back to top</a>)</p>
 

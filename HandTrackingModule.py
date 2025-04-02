@@ -11,12 +11,14 @@ ENV_FILE = os.path.join(os.path.dirname(__file__), '.env')
 load_dotenv(dotenv_path=ENV_FILE)
 MIDI_PORT_NAME = os.getenv("MIDI_PORT", "Python to VCV 1")
 
+#tipIds = [4, 8, 12, 16, 20]
+
 class HandDetector:
     """
     Handles all low-level hand detection with MediaPipe, plus the actual
     geometry or logic for each gesture (bounding box volume, pinch, fist, etc.)
     """
-    def __init__(self, mode=False, maxHands=2, detectionConf=0.5, trackConf=0.5, model_path = None):
+    def __init__(self, mode=False, maxHands=2, detectionConf=0.5, trackConf=0.5, model_path = None, tipIds = [4, 8, 12, 16, 20]):
         self.mode = mode
         self.maxHands = maxHands
         self.detectionConf = detectionConf
@@ -30,6 +32,7 @@ class HandDetector:
             min_tracking_confidence=self.trackConf
         )
         self.mpDraw = mp.solutions.drawing_utils
+        self.tipIds = tipIds
         self.lmList = []  # landmarks for the current frame
         self.results = None
 
@@ -187,6 +190,9 @@ class HandDetector:
     
     def is_victory(self) -> bool:
         # Detects victory/peace sign (index and middle fingers up, others down)
+        if not hasattr(self, 'tipIds'):
+            print("Error: tipIds attribute missing")
+            return False
         if not self.lmList or len(self.lmList) < 21:
             return False
         

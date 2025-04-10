@@ -17,7 +17,7 @@
 <h3 align="center">HanDI</h3>
 
   <p align="center">
-    A brief description of what this project does and who it's for.
+  This project is a MIDI controller using gesture recognition to control what the user wants. Based on gestures mapped to commands that are customisable by the user, the program sends MIDI commands, allowing the user to control their show during a live performance or even when produciing music, using MIDI makes it compatible with industry standard software. This project was made for the course 0LAUK0 Project Robots Everywhere at the TU/e.
     <br />
     <a href="https://github.com/Gabriel-Karpinsky/HanDI"><strong>Explore the docs »</strong></a>
     <br />
@@ -60,8 +60,6 @@
 ## About The Project
 
 [![Product Name Screen Shot][product-screenshot]](https://example.com)
-
-Provide a brief overview of your project here. Explain what the project is, its purpose, and the problems it aims to solve.
 
 <p align="right">(<a href="#top">back to top</a>)</p>
 
